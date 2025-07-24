@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: gravity
+    component: nats
+    release: lab-gravity
+  name: lab-gravity-nats
+  namespace: gravity2-lab
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: gravity
+      component: nats
+      release: lab-gravity
+  serviceName: lab-gravity-nats-mgmt
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: gravity
+        component: nats
+        release: lab-gravity
+    spec:
+      containers:
+        - command:
+            - /nats-server
+            - --routes=lab-gravity-nats-0.lab-gravity-nats-mgmt.gravity2-lab.svc.cluster.local:6222
+            - --routes=lab-gravity-nats-1.lab-gravity-nats-mgmt.gravity2-lab.svc.cluster.local:6222
+            - --routes=lab-gravity-nats-2.lab-gravity-nats-mgmt.gravity2-lab.svc.cluster.local:6222
+          image: ghcr.io/brobridgeorg/nats-server:v1.3.25-20250701
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8222
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: lab-gravity-nats
+          ports:
+            - containerPort: 4222
+              name: listen-port
+              protocol: TCP
+            - containerPort: 6222
+              name: listen-mgmt
+              protocol: TCP
+            - containerPort: 8222
+              name: listen-http
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "4"
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /datastore
+              name: lab-nats-store
+      securityContext: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: lab-nats-store
+      spec:
+        accessModes: 
+        - ReadWriteOnce
+        storageClassName: "local-path"
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gravity
+    component: nats
+    release: lab-gravity
+  name: lab-gravity-nats
+  namespace: gravity2-lab
+spec:
+  ports:
+    - name: tcp-lab-gravity-nats
+      port: 4222
+      protocol: TCP
+      targetPort: 4222
+  selector:
+    app: gravity
+    component: nats
+    release: lab-gravity
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gravity
+    component: nats
+    release: lab-gravity
+  name: lab-gravity-nats-mgmt
+  namespace: gravity2-lab
+spec:
+  ports:
+    - name: tcp-lab-gravity-nats-mgmt
+      port: 6222
+      protocol: TCP
+      targetPort: 6222
+    - name: tcp-lab-gravity-monitoring
+      port: 8222
+      protocol: TCP
+      targetPort: 8222
+  selector:
+    app: gravity
+    component: nats
+    release: lab-gravity
+  sessionAffinity: None
+  type: ClusterIP

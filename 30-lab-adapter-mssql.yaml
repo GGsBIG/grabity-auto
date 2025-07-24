@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: gravity-adapter
+    component: mssql
+    release: lab-adapter-mssql
+  name: lab-adapter-mssql
+  namespace: gravity2-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gravity-adapter
+      component: mssql
+      release: lab-adapter-mssql
+  serviceName: ""
+  template:
+    metadata:
+      labels:
+        app: gravity-adapter
+        component: mssql
+        release: lab-adapter-mssql
+    spec:
+      containers:
+      - env:
+        - name: GRAVITY_ADAPTER_MSSQL_GRAVITY_HOST
+          value: lab-gravity-nats
+        - name: GRAVITY_ADAPTER_MSSQL_GRAVITY_PORT
+          value: "4222"
+        - name: MSSQL_SOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: labsecret
+              key: db_source_mssql_password
+        - name: GRAVITY_ADAPTER_MSSQL_SOURCE_SETTINGS
+          value: |
+            {
+              "sources": {
+                "mssql_source": {
+                  "disabled": false,
+                  "host": "source-mssql",
+                  "port": 1433,
+                  "username": "SA",
+                  "dbname": "TestDB",
+                  "param": "",
+                  "initialLoad": false,
+                  "interval": 1,
+                  "tables": {
+                    "dbo.mi_source":{
+                      "events": {
+                        "snapshot": "misrcInitialize",
+                        "create": "misrcCreate",
+                        "update": "misrcUpdate",
+                        "delete": "misrcDelete"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        - name: GRAVITY_ADAPTER_MSSQL_STORE_ENABLED
+          value: "true"
+        - name: GRAVITY_ADAPTER_MSSQL_STORE_PATH
+          value: ./statestore
+        image: ghcr.io/brobridgeorg/gravity-adapter-mssql:v3.0.9-20240909
+        imagePullPolicy: IfNotPresent
+        name: lab-adapter-mssql
+        volumeMounts:
+        - mountPath: ./statestore
+          name: lab-adapter-mssql-store
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - until nc -z -w 2 lab-gravity-nats 4222; do echo waiting for lab-gravity-nats:4222;
+          sleep 1; done
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+        name: init-lab-adapter-mssql
+      securityContext: {}
+      volumes:
+      - name: lab-adapter-mssql-store
+        persistentVolumeClaim:
+          claimName: lab-adapter-mssql-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: lab-adapter-mssql-store
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 200Mi
+        storageClassName: "local-path"

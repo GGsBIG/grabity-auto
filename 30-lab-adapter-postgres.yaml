@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: gravity-adapter
+    component: postgres
+    release: lab-adapter-postgres
+  name: lab-adapter-postgres
+  namespace: gravity2-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gravity-adapter
+      component: postgres
+      release: lab-adapter-postgres
+  serviceName: ""
+  template:
+    metadata:
+      labels:
+        app: gravity-adapter
+        component: postgres
+        release: lab-adapter-postgres
+    spec:
+      containers:
+      - env:
+        - name: GRAVITY_ADAPTER_POSTGRES_GRAVITY_HOST
+          value: lab-gravity-nats
+        - name: GRAVITY_ADAPTER_POSTGRES_GRAVITY_PORT
+          value: "4222"
+        - name: POSTGRES_SOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: labsecret
+              key: db_source_postgres_password
+        - name: GRAVITY_ADAPTER_POSTGRES_SOURCE_SETTINGS
+          value: |
+            {
+              "sources": {
+                "postgres_source": {
+                  "disabled": false,
+                  "host": "source-postgres",
+                  "port": 5432,
+                  "username": "postgres",
+                  "dbname": "testdb",
+                  "param": "sslmode=disable",
+                  "initialLoad": false,
+                  "interval": 1,
+                  "tables": {
+                    "public.source_table":{
+                      "events": {
+                        "snapshot": "sourceInitialize",
+                        "create": "sourceCreate",
+                        "update": "sourceUpdate",
+                        "delete": "sourceDelete"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        - name: GRAVITY_ADAPTER_POSTGRES_STORE_ENABLED
+          value: "true"
+        - name: GRAVITY_ADAPTER_POSTGRES_STORE_PATH
+          value: ./statestore
+        image: ghcr.io/brobridgeorg/gravity-adapter-postgres:v2.0.8-20250601
+        imagePullPolicy: IfNotPresent
+        name: lab-adapter-postgres
+        volumeMounts:
+        - mountPath: ./statestore
+          name: lab-adapter-postgres-store
+        resources:
+          limits:
+            cpu: "2"
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - until nc -z -w 2 lab-gravity-nats 4222; do echo waiting for lab-gravity-nats:4222;
+          sleep 1; done
+        image: busybox:1.36
+        imagePullPolicy: IfNotPresent
+        name: init-lab-adapter-postgres
+      securityContext: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: lab-adapter-postgres-store
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 200Mi
+        storageClassName: "local-path"

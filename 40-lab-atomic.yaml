@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: atomic
+    release: lab-atomic
+  name: lab-atomic-atomic
+  namespace: gravity2-lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: atomic
+      release: lab-atomic
+  template:
+    metadata:
+      labels:
+        app: atomic
+        release: lab-atomic
+    spec:
+      initContainers:
+        - command:
+            - sh
+            - -c
+            - echo -e "Run git command:\ngit clone -b ${GIT_BRANCH} --single-branch http://${GIT_USER}:${GIT_TOKEN:0:5}....................${GIT_TOKEN:35:5}@${GIT_URL}/${GIT_REPO_URL} /data/atomic"; test -d /data/atomic/.git && rm -rf /data/atomic; until [ -d /data/atomic/.git ]; do date; git clone -b ${GIT_BRANCH} --single-branch http://${GIT_USER}:${GIT_TOKEN}@${GIT_URL}/${GIT_REPO_URL} /data/atomic && echo 'Done!' || echo 'Failed!'; sleep 3; done
+          image: ghcr.io/brobridgeorg/atomic/atomic:v0.0.5-20231012-ubi
+          imagePullPolicy: IfNotPresent
+          name: init-lab-atomic-git
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /data
+              name: atomic-store
+          env:
+            - name: GIT_BRANCH
+              valueFrom:
+                configMapKeyRef:
+                  key: GIT_BRANCH
+                  name: labcm
+            - name: GIT_REPO_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: GIT_REPO_URL
+                  name: labcm
+            - name: GIT_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  key: GIT_TOKEN
+                  name: labcm
+            - name: GIT_URL
+              valueFrom:
+                configMapKeyRef:
+                  key: GIT_URL
+                  name: labcm
+            - name: GIT_USER
+              valueFrom:
+                configMapKeyRef:
+                  key: GIT_USER
+                  name: labcm
+      containers:
+      - env:
+        - name: TZ
+          valueFrom:
+            configMapKeyRef:
+              name: labcm
+              key: TZ
+        - name: TARGET_DB_MYSQL_NAME
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_NAME
+        - name: TARGET_DB_MYSQL_HOST
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_HOST
+        - name: TARGET_DB_MYSQL_PORT
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_PORT
+        - name: TARGET_DB_MYSQL_DB_NAME
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_DB_NAME
+        - name: TARGET_DB_MYSQL_TB1_NAME
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_TB1_NAME
+        - name: TARGET_DB_MYSQL_USER
+          valueFrom: 
+            configMapKeyRef:
+              name: labcm
+              key: TARGET_DB_MYSQL_USER
+        - name: TARGET_DB_MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: labsecret
+              key: db_target_mysql_password
+        image: ghcr.io/brobridgeorg/atomic/atomic:v0.0.5-20231012-ubi
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - mountPath: /data
+            name: atomic-store
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 1880
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 10
+        name: lab-atomic
+        resources:
+          limits:
+            cpu: "2"
+            memory: 500Mi
+          requests:
+            cpu: 200m
+            memory: 300Mi
+        command: ["sh", "/atomic/startup.sh"]
+        ports:
+        - containerPort: 1880
+          name: listen-port
+          protocol: TCP
+      restartPolicy: Always
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: atomic-store
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: atomic
+    release: lab-atomic
+  name: lab-atomic
+  namespace: gravity2-lab
+spec:
+  ports:
+  - name: lab-atomic
+    nodePort: 32300
+    port: 1880
+    protocol: TCP
+    targetPort: 1880
+  selector:
+    app: atomic
+    release: lab-atomic
+  type: NodePort
