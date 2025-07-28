@@ -27,8 +27,8 @@ data:
   TARGET_DB_MYSQL_TB1_NAME: target_id13
   TARGET_DB_MYSQL_USER: mysql
   # Git 配置
-  GIT_BRANCH: master
-  GIT_REPO_URL: demo/gravity2-lab.git
-  GIT_TOKEN: 3dbfbb772fd5d5a34a3e05fd4950b2bb7a43740b
-  GIT_URL: gitea:3000
-  GIT_USER: demo
+  GIT_BRANCH: main
+  GIT_REPO_URL: gravity/gravity.git
+  GIT_TOKEN: 241bd5bb65bed03e1efe8ebad27a74c4cf911ae7
+  GIT_URL: 10.10.7.210:31300
+  GIT_USER: gravity
