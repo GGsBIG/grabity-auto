@@ -23,7 +23,7 @@ spec:
             - sh
             - -c
             - echo -e "Run git command:\ngit clone -b ${GIT_BRANCH} --single-branch http://${GIT_USER}:${GIT_TOKEN:0:5}....................${GIT_TOKEN:35:5}@${GIT_URL}/${GIT_REPO_URL} /data/atomic"; test -d /data/atomic/.git && rm -rf /data/atomic; until [ -d /data/atomic/.git ]; do date; git clone -b ${GIT_BRANCH} --single-branch http://${GIT_USER}:${GIT_TOKEN}@${GIT_URL}/${GIT_REPO_URL} /data/atomic && echo 'Done!' || echo 'Failed!'; sleep 3; done
-          image: ghcr.io/brobridgeorg/atomic/atomic:v0.0.5-20231012-ubi
+          image: ghcr.io/brobridgeorg/atomic:v1.0.0-20250711-ubi
           imagePullPolicy: IfNotPresent
           name: init-lab-atomic-git
           resources: {}
@@ -100,7 +100,7 @@ spec:
             secretKeyRef:
               name: labsecret
               key: db_target_mysql_password
-        image: ghcr.io/brobridgeorg/atomic/atomic:v0.0.5-20231012-ubi
+        image: ghcr.io/brobridgeorg/atomic:v1.0.0-20250711-ubi
         imagePullPolicy: IfNotPresent
         volumeMounts:
           - mountPath: /data
